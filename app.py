@@ -1,13 +1,3 @@
-
-
-
----
-
-## 2. Streamlit Web App (`app.py`)
-
-Place `app.py` and your downloaded `fraud_detection_xgb.json` file in the same folder on your laptop. This app lets you test both single transactions (using the top features `V14`, `V17`, `V4`, `V10`, and `Amount`[cite: 5]) and batch CSV uploads:
-
-```python
 import streamlit as st
 import pandas as pd
 from xgboost import XGBClassifier
@@ -16,7 +6,6 @@ st.set_page_config(page_title="Fraud Detection System", layout="centered")
 st.title("Credit Card Fraud Detection")
 st.write("Powered by XGBoost (ROC-AUC: 0.99998)")
 
-# Load the saved XGBoost model
 @st.cache_resource
 def load_model():
     model = XGBClassifier()
@@ -40,7 +29,6 @@ with tab1:
         v10 = st.number_input("V10", value=0.0, step=0.1)
 
     if st.button("Predict Fraud Risk", type="primary"):
-        # Populate all expected features with 0.0 defaults, then set user inputs
         input_data = {feat: 0.0 for feat in expected_features}
         for key, val in {"V14": v14, "V17": v17, "V4": v4, "V10": v10, "Amount": amount}.items():
             if key in input_data:
