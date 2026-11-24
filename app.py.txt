@@ -1,0 +1,69 @@
+
+
+
+---
+
+## 2. Streamlit Web App (`app.py`)
+
+Place `app.py` and your downloaded `fraud_detection_xgb.json` file in the same folder on your laptop. This app lets you test both single transactions (using the top features `V14`, `V17`, `V4`, `V10`, and `Amount`[cite: 5]) and batch CSV uploads:
+
+```python
+import streamlit as st
+import pandas as pd
+from xgboost import XGBClassifier
+
+st.set_page_config(page_title="Fraud Detection System", layout="centered")
+st.title("Credit Card Fraud Detection")
+st.write("Powered by XGBoost (ROC-AUC: 0.99998)")
+
+# Load the saved XGBoost model
+@st.cache_resource
+def load_model():
+    model = XGBClassifier()
+    model.load_model("fraud_detection_xgb.json")
+    return model
+
+model = load_model()
+expected_features = model.get_booster().feature_names
+
+tab1, tab2 = st.tabs(["Single Transaction Check", "Batch CSV Upload"])
+
+with tab1:
+    st.subheader("Test Key Transaction Signals")
+    col1, col2 = st.columns(2)
+    with col1:
+        v14 = st.number_input("V14 (Primary Signal)", value=0.0, step=0.1)
+        v17 = st.number_input("V17", value=0.0, step=0.1)
+        amount = st.number_input("Transaction Amount", value=100.0, min_value=0.0, step=10.0)
+    with col2:
+        v4 = st.number_input("V4", value=0.0, step=0.1)
+        v10 = st.number_input("V10", value=0.0, step=0.1)
+
+    if st.button("Predict Fraud Risk", type="primary"):
+        # Populate all expected features with 0.0 defaults, then set user inputs
+        input_data = {feat: 0.0 for feat in expected_features}
+        for key, val in {"V14": v14, "V17": v17, "V4": v4, "V10": v10, "Amount": amount}.items():
+            if key in input_data:
+                input_data[key] = val
+
+        df_input = pd.DataFrame([input_data])[expected_features]
+        pred = int(model.predict(df_input)[0])
+        prob = float(model.predict_proba(df_input)[0][1]) * 100
+
+        if pred == 1:
+            st.error(f"Fraudulent Transaction Detected (Probability: {prob:.2f}%)")
+        else:
+            st.success(f"Legitimate Transaction (Fraud Probability: {prob:.2f}%)")
+
+with tab2:
+    st.subheader("Upload Transaction CSV")
+    uploaded_file = st.file_uploader("Upload a CSV matching the dataset columns", type=["csv"])
+    if uploaded_file is not None:
+        batch_df = pd.read_csv(uploaded_file).dropna()
+        X_batch = batch_df[expected_features]
+        batch_df["Predicted_Class"] = model.predict(X_batch)
+        batch_df["Fraud_Probability_%"] = (model.predict_proba(X_batch)[:, 1] * 100).round(2)
+
+        fraud_count = int(batch_df["Predicted_Class"].sum())
+        st.metric("Flagged Fraud Transactions", f"{fraud_count} / {len(batch_df)}")
+        st.dataframe(batch_df[batch_df["Predicted_Class"] == 1].head(20))
